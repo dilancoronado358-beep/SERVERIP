@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <title>Guardian Cam</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #000;
+      color: #ccc;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 14px;
+      gap: 10px;
+      /* Evitar seleccion de texto accidental */
+      user-select: none;
+    }
+
+    /* ── MODO BATERÍA: pantalla totalmente negra ─────────────────────────── */
+    body.battery-mode { background: #000 !important; }
+    body.battery-mode .ui-area { display: none !important; }
+    body.battery-mode #batteryScreen { display: flex !important; }
+
+    /* Pantalla negra en modo batería */
+    #batteryScreen {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #000;
+      z-index: 999;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      cursor: pointer;
+    }
+    #batteryScreen .icon { font-size: 2em; opacity: .15; }
+    #batteryScreen p { font-size: .7em; color: #222; text-align: center; }
+    /* Indicador mínimo (no molesta, no gasta) */
+    #batteryDot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #003300;
+      animation: blink 4s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:.2} 50%{opacity:.6} }
+
+    /* ── UI NORMAL ────────────────────────────────────────────────────────── */
+    .ui-area { width: 100%; max-width: 480px; display:flex; flex-direction:column; gap:10px; }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+    }
+    header h1 { font-size: 1em; flex:1; color: #ddd; }
+    .dot-live {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #222;
+      transition: background .3s;
+    }
+    .dot-live.on { background: #00ff88; box-shadow: 0 0 6px #00ff88; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* Preview de video (oculto en modo batería) */
+    #videoWrap {
+      width: 100%;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #0a0a0a;
+      aspect-ratio: 4/3;
+      position: relative;
+    }
+    video {
+      width:100%; height:100%;
+      object-fit: cover;
+      display: block;
+    }
+    .video-off { display: none; }
+
+    /* Botones principales */
+    .btn-row { display: flex; gap: 8px; }
+    .btn {
+      flex: 1;
+      padding: 14px 10px;
+      border-radius: 12px;
+      border: none;
+      font-size: .9em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform .1s;
+    }
+    .btn:active { transform: scale(.95); }
+    .btn:disabled { opacity: .35; cursor: default; }
+    .btn-green  { background: linear-gradient(135deg,#00ff88,#00bb55); color:#000; }
+    .btn-red    { background: linear-gradient(135deg,#ff4444,#bb0000); color:#fff; }
+    .btn-dark   { background: #1a1a1a; color:#aaa; border:1px solid #2a2a2a; }
+    .btn-bat    { background: linear-gradient(135deg,#ff9900,#cc6600); color:#000; font-size:.82em; }
+
+    /* Panel de info */
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .info-card {
+      background: #0f0f0f;
+      border: 1px solid #1e1e1e;
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .info-card label { display:block; font-size:.65em; color:#444; text-transform:uppercase; margin-bottom:3px; }
+    .info-card .v { font-family: monospace; color: #00ff88; font-size:.88em; word-break:break-all; }
+    .info-card .v.warn { color: #ff9900; }
+    .info-card .v.err  { color: #ff4444; }
+    .info-card.full { grid-column: 1 / -1; }
+
+    /* URL pública */
+    .url-box {
+      background: #0a1a0a;
+      border: 1px solid #1a3a1a;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: .75em;
+      word-break: break-all;
+    }
+    .url-box label { color: #2a5a2a; display:block; margin-bottom:4px; text-transform:uppercase; font-size:.7em; }
+    .url-box .url  { color: #00cc55; font-family: monospace; }
+
+    /* Log compacto */
+    .log {
+      background: #050505;
+      border: 1px solid #111;
+      border-radius: 10px;
+      padding: 8px 10px;
+      height: 90px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: .7em;
+      color: #333;
+    }
+    .log .e { margin-bottom:3px; }
+    .log .e.ok   { color: #00aa44; }
+    .log .e.err  { color: #aa2222; }
+    .log .e.warn { color: #aa6600; }
+
+    /* Slider FPS */
+    .slider-row { display:flex; align-items:center; gap:10px; font-size:.78em; color:#555; }
+    input[type=range] { flex:1; accent-color:#00ff88; }
+
+    /* Nota OS */
+    .note {
+      font-size: .68em;
+      color: #2a2a2a;
+      text-align: center;
+      padding: 0 10px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ PANTALLA NEGRA (modo batería) ══════════════════════════════════════════ -->
+<div id="batteryScreen" onclick="exitBatteryMode()">
+  <div id="batteryDot"></div>
+  <div class="icon">🔐</div>
+  <p>Transmitiendo en segundo plano<br>Toca para volver</p>
+</div>
+
+<!-- ══ UI NORMAL ══════════════════════════════════════════════════════════════ -->
+<div class="ui-area">
+
+  <header>
+    <h1>🔐 Guardian Cam</h1>
+    <div class="dot-live" id="liveDot"></div>
+    <span id="statusLabel" style="font-size:.75em;color:#444">Inactivo</span>
+  </header>
+
+  <!-- Preview local -->
+  <div id="videoWrap">
+    <video id="video" autoplay muted playsinline></video>
+  </div>
+
+  <!-- Botones principales -->
+  <div class="btn-row">
+    <button class="btn btn-green" id="btnStart" onclick="startCamera()">▶ Activar</button>
+    <button class="btn btn-red"   id="btnStop"  onclick="stopCamera()" disabled>⏹ Stop</button>
+    <button class="btn btn-dark"  id="btnFlip"  onclick="flipCamera()">🔄</button>
+  </div>
+
+  <!-- Modo batería -->
+  <button class="btn btn-bat" id="btnBat" onclick="enterBatteryMode()" disabled>
+    🔋 Modo Batería — Apagar pantalla y seguir transmitiendo
+  </button>
+
+  <!-- FPS -->
+  <div class="slider-row">
+    <span>FPS:</span>
+    <input type="range" id="fpsRange" min="1" max="15" value="8" oninput="updateFPS(this.value)"/>
+    <span id="fpsLabel">8</span>
+  </div>
+
+  <!-- Info del dispositivo -->
+  <div class="info-grid">
+    <div class="info-card">
+      <label>Tu IP</label>
+      <div class="v" id="myIP">—</div>
+    </div>
+    <div class="info-card">
+      <label>Viewers</label>
+      <div class="v" id="viewerCount">0</div>
+    </div>
+    <div class="info-card">
+      <label>Frames enviados</label>
+      <div class="v" id="framesSent">0</div>
+    </div>
+    <div class="info-card">
+      <label>FPS real</label>
+      <div class="v" id="realFps">0</div>
+    </div>
+    <div class="info-card full">
+      <label>Última actividad</label>
+      <div class="v" id="lastActivity">—</div>
+    </div>
+  </div>
+
+  <!-- URL pública del tunel -->
+  <div class="url-box" id="urlBox" style="display:none">
+    <label>🌐 URL pública (datos móviles / WiFi remoto)</label>
+    <div class="url" id="tunnelUrl">—</div>
+  </div>
+
+  <!-- Log -->
+  <div class="log" id="log"></div>
+
+  <p class="note">
+    ⚠️ El indicador de cámara del sistema operativo (punto verde iOS / barra Android)
+    es obligatorio por ley y no puede desactivarse desde ninguna app.
+    Usa <b>Modo Batería</b> para apagar la pantalla y reducir el consumo al mínimo.
+  </p>
+
+</div><!-- /ui-area -->
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+// ── Configuración ─────────────────────────────────────────────────────────────
+let fps          = 8;
+let frameInterval = 1000 / fps;
+let facingMode   = 'environment';
+let socket, stream, frameTimer, wakeLock;
+let framesSent   = 0;
+let fpsCounter   = 0;
+let canvas, ctx;
+
+// ── Log ───────────────────────────────────────────────────────────────────────
+function log(msg, type='') {
+  const div = document.getElementById('log');
+  const t   = new Date().toLocaleTimeString();
+  div.innerHTML = `<div class="e ${type}">[${t}] ${msg}</div>` + div.innerHTML;
+}
+
+function setStatus(txt, live=false) {
+  document.getElementById('statusLabel').textContent = txt;
+  document.getElementById('liveDot').className = 'dot-live' + (live ? ' on' : '');
+}
+
+// ── FPS ───────────────────────────────────────────────────────────────────────
+function updateFPS(val) {
+  fps = parseInt(val);
+  frameInterval = 1000 / fps;
+  document.getElementById('fpsLabel').textContent = val;
+  if (frameTimer) { clearInterval(frameTimer); startStreaming(); }
+}
+
+setInterval(() => {
+  document.getElementById('realFps').textContent = fpsCounter;
+  fpsCounter = 0;
+}, 1000);
+
+// ── Screen Wake Lock (evita que la pantalla se duerma) ────────────────────────
+async function requestWakeLock() {
+  if ('wakeLock' in navigator) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      log('Wake lock activo (pantalla no se apaga sola)', 'ok');
+    } catch(e) { log('Wake lock no disponible: ' + e.message, 'warn'); }
+  }
+}
+// Recuperar wake lock si la página vuelve al primer plano
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && stream && !wakeLock) {
+    await requestWakeLock();
+  }
+});
+
+// ── Socket ────────────────────────────────────────────────────────────────────
+function connectSocket() {
+  // Conectar al servidor correcto (local o tunel)
+  socket = io({ transports: ['websocket', 'polling'] });
+
+  socket.on('connect', () => {
+    log('Servidor conectado ✓', 'ok');
+    socket.emit('register-camera', { deviceInfo: navigator.userAgent.slice(0,80) });
+  });
+
+  socket.on('camera-confirmed', (d) => {
+    log('Cámara registrada ✓', 'ok');
+    setStatus('EN VIVO', true);
+
+    // Mostrar URL pública si existe
+    if (d.tunnelUrl) {
+      document.getElementById('tunnelUrl').textContent = d.tunnelUrl + '/viewer';
+      document.getElementById('urlBox').style.display = 'block';
+      log('URL pública: ' + d.tunnelUrl, 'ok');
+    }
+  });
+
+  socket.on('viewer-count', (n) => {
+    document.getElementById('viewerCount').textContent = n;
+  });
+
+  socket.on('command', (cmd) => {
+    log('Comando: ' + cmd.action, 'warn');
+    if (cmd.action === 'flip') flipCamera();
+    if (cmd.action === 'stop') stopCamera();
+  });
+
+  socket.on('disconnect', () => {
+    log('Servidor desconectado', 'err');
+    setStatus('Reconectando...', false);
+  });
+}
+
+// ── Cámara ────────────────────────────────────────────────────────────────────
+async function startCamera() {
+  try {
+    log('Solicitando cámara...');
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode, width:{ideal:640}, frameRate:{ideal:fps, max:15} },
+      audio: false
+    });
+
+    const video = document.getElementById('video');
+    video.srcObject = stream;
+    await video.play();
+
+    canvas = document.createElement('canvas');
+    ctx    = canvas.getContext('2d');
+
+    document.getElementById('btnStart').disabled = true;
+    document.getElementById('btnStop').disabled  = false;
+    document.getElementById('btnBat').disabled   = false;
+    log('Cámara activada ✓', 'ok');
+
+    // Wake lock para mantener transmisión activa
+    await requestWakeLock();
+    connectSocket();
+    startStreaming();
+
+    // Obtener IP
+    fetch('/api/ip').then(r => r.json()).then(d => {
+      document.getElementById('myIP').textContent = d.clientIP;
+      log('IP: ' + d.clientIP, 'ok');
+    }).catch(()=>{});
+
+    // Intentar obtener URL de tunel también
+    fetch('/api/tunnel').then(r => r.json()).then(d => {
+      if (d.url) {
+        document.getElementById('tunnelUrl').textContent = d.url + '/viewer';
+        document.getElementById('urlBox').style.display = 'block';
+      }
+    }).catch(()=>{});
+
+  } catch(e) {
+    log('Error de cámara: ' + e.message, 'err');
+    setStatus('Error', false);
+  }
+}
+
+function stopCamera() {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  clearInterval(frameTimer);
+  if (socket) socket.disconnect();
+  if (wakeLock) { wakeLock.release(); wakeLock = null; }
+  stream = null;
+  document.getElementById('video').srcObject = null;
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnStop').disabled  = true;
+  document.getElementById('btnBat').disabled   = true;
+  exitBatteryMode();
+  setStatus('Detenido');
+  log('Cámara detenida');
+}
+
+async function flipCamera() {
+  facingMode = facingMode === 'environment' ? 'user' : 'environment';
+  if (!stream) return;
+  stream.getTracks().forEach(t => t.stop());
+  clearInterval(frameTimer);
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode, width:{ideal:640}, frameRate:{ideal:fps, max:15} },
+      audio: false
+    });
+    const v = document.getElementById('video');
+    v.srcObject = stream;
+    v.style.transform = facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
+    await v.play();
+    startStreaming();
+    log('Cámara: ' + (facingMode === 'environment' ? 'trasera' : 'frontal'), 'ok');
+  } catch(e) { log('Error cambiando cámara: ' + e.message, 'err'); }
+}
+
+// ── Streaming ─────────────────────────────────────────────────────────────────
+function startStreaming() {
+  const video = document.getElementById('video');
+  clearInterval(frameTimer);
+  frameTimer = setInterval(() => {
+    if (!socket?.connected || !stream) return;
+    const w = video.videoWidth  || 640;
+    const h = video.videoHeight || 480;
+    canvas.width  = w;
+    canvas.height = h;
+    ctx.drawImage(video, 0, 0, w, h);
+    // Calidad dinámica: menos viewers = menos calidad (ahorra batería)
+    const quality = document.body.classList.contains('battery-mode') ? 0.4 : 0.55;
+    socket.emit('video-frame', canvas.toDataURL('image/jpeg', quality));
+    framesSent++;
+    fpsCounter++;
+    document.getElementById('framesSent').textContent = framesSent;
+    document.getElementById('lastActivity').textContent = new Date().toLocaleTimeString();
+  }, frameInterval);
+}
+
+// ── Modo Batería ──────────────────────────────────────────────────────────────
+// El stream CONTINÚA activo; solo apagamos la UI y el preview local.
+// Esto elimina el render de canvas visible y el video tag renderizado,
+// reduciendo el trabajo de la GPU significativamente.
+
+function enterBatteryMode() {
+  // Pausar el video visible (sigue capturando pero no renderiza)
+  const video = document.getElementById('video');
+  video.style.opacity = '0'; // ocultar sin parar el stream
+
+  document.body.classList.add('battery-mode');
+  log('Modo batería activado 🔋', 'warn');
+
+  // Reducir brillo via WakeLock es imposible desde la web,
+  // pero al mostrar pantalla negra el OLED gasta ~0 energía.
+}
+
+function exitBatteryMode() {
+  document.body.classList.remove('battery-mode');
+  const video = document.getElementById('video');
+  video.style.opacity = '1';
+  log('Modo batería desactivado', 'ok');
+}
+
+// Volver de modo batería al tocar la pantalla
+document.addEventListener('touchstart', (e) => {
+  if (!document.body.classList.contains('battery-mode')) return;
+  exitBatteryMode();
+  e.preventDefault();
+}, { passive: false });
+</script>
+</body>
+</html>

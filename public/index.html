@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Guardian Cam</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0a0a0f;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      padding: 20px;
+    }
+    .logo {
+      font-size: 3em;
+      text-align: center;
+    }
+    h1 {
+      font-size: 1.8em;
+      background: linear-gradient(135deg, #00ff88, #00aaff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-align: center;
+    }
+    p { color: #888; text-align: center; }
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      width: 100%;
+      max-width: 320px;
+    }
+    .btn {
+      display: block;
+      padding: 18px 24px;
+      border-radius: 14px;
+      text-decoration: none;
+      text-align: center;
+      font-size: 1.1em;
+      font-weight: 600;
+      transition: transform .15s, box-shadow .15s;
+      cursor: pointer;
+      border: none;
+    }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+    .btn-cam  { background: linear-gradient(135deg, #00ff88, #00cc66); color: #000; }
+    .btn-view { background: linear-gradient(135deg, #0088ff, #0055cc); color: #fff; }
+    .badge {
+      display: inline-block;
+      background: #1a1a2e;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 12px 20px;
+      font-size: .85em;
+      color: #aaa;
+      text-align: center;
+    }
+    .badge span { color: #00ff88; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div class="logo">🔐</div>
+  <h1>Guardian Cam</h1>
+  <p>Sistema de seguridad con cámara en tiempo real</p>
+
+  <div class="btn-group">
+    <a class="btn btn-cam" href="/camera">
+      📱 Activar Cámara (celular)
+    </a>
+    <a class="btn btn-view" href="/viewer">
+      👁️ Ver Cámara (panel)
+    </a>
+  </div>
+
+  <div class="badge" id="ipInfo">Cargando IP...</div>
+
+  <script>
+    fetch('/api/ip').then(r => r.json()).then(data => {
+      const el = document.getElementById('ipInfo');
+      let html = `Tu IP: <span>${data.clientIP}</span><br>`;
+      data.serverIPs.forEach(s => {
+        html += `Servidor: <span>http://${s.address}:3000</span><br>`;
+      });
+      el.innerHTML = html;
+    });
+  </script>
+</body>
+</html>
+
